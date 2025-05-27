@@ -1,0 +1,44 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log
+pnpm-debug.log*
+
+# Logs
+logs
+*.log
+logs/*.log
+debug.log
+error.log
+
+backend/.env
+backend/forisl/
+
+# Environment Variables
+.env
+#Virtual Environment
+forisl/
+# Database & Cache
+dump.rdb
+*.sqlite
+*.sqlite3
+*.db
+*.tgz
+
+# Compiled Files
+dist/
+build/
+.out/
+
+# IDE/Editor Files
+.vscode/
+.idea/
+*.sublime-workspace
+
+# OS-Specific Files
+.DS_Store
+Thumbs.db
+
+# Twilio Secrets (if stored)
+.twilio/
+.env/

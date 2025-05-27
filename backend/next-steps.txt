@@ -1,0 +1,1 @@
+middleware creation remains to check if user is logged in the routes wherever required.

@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 207 100% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 33% 98%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 220 33% 98%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 220 33% 98%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 33% 98%;
+    --input: 220 33% 98%;
+    --ring: 207 100% 35%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    filter: brightness(1) blur(0px);
+  }
+  50% {
+    filter: brightness(1.5) blur(2px);
+  }
+}
+
+.animate-glow {
+  animation: pulse-glow 3s infinite;
+}
+
+.network-pattern {
+  background-image: radial-gradient(circle at center, rgba(0, 102, 179, 0.15) 0%, transparent 70%),
+    linear-gradient(45deg, rgba(0, 102, 179, 0.1) 25%, transparent 25%, transparent 75%, rgba(0, 102, 179, 0.1) 75%);
+  background-size: 100% 100%, 50px 50px;
+  background-position: center;
+}
+

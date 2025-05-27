@@ -1,0 +1,19 @@
+# Ignore data files and temporary results
+isllll/data/
+isllll/data.pickle
+isllll/model.p
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter/IPython checkpoints if any
+.ipynb_checkpoints/
+
+# VSCode settings (if you're sharing your code)
+.vscode/
+
+# Virtual environments (if inside this folder)
+venv/
+env/
