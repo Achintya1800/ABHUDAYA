@@ -1,7 +1,8 @@
 # Ignore data files and temporary results
-isllll/data/
-isllll/data.pickle
-isllll/model.p
+data/
+data.pickle
+
+model.p
 
 # Python cache and compiled files
 __pycache__/
