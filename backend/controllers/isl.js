@@ -1,10 +1,12 @@
+
 const { spawn } = require('child_process');
 const express = require('express');
 const axios = require('axios');
+require('dotenv').config(); // Add this line to load environment variables
 
 const app = express();
-const PORT = 3000;
-const GEMINI_API_KEY = 'AIzaSyDvWEkbsXi9_sfG9L_eGfl_vZVGFvPCOK0'; // Replace with your actual API key
+const PORT = process.env.PORT || 3000;
+const GEMINI_API_KEY_FOR_ISL = process.env.GEMINI_API_KEY_FOR_ISL; // Use environment variable
 
 app.get('/predict', (req, res) => {
     const pythonProcess = spawn('python', ['islllll/finalll.py']);
@@ -32,7 +34,7 @@ async function sendToGemini(message) {
         const response = await axios.post(
             'https://api.gemini.com/v1/chat',
             { message },
-            { headers: { 'Authorization': `Bearer ${GEMINI_API_KEY}` } }
+            { headers: { 'Authorization': `Bearer ${GEMINI_API_KEY_FOR_ISL}` } }
         );
         return response.data;
     } catch (error) {

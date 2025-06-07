@@ -87,7 +87,7 @@ while True:
     print(json.dumps({"predicted_characters": predicted_characters}))
 
     # Wait for 1.5 seconds before making the next prediction
-    time.sleep(2)
+    time.sleep(3)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break

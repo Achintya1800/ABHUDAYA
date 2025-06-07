@@ -1,22 +1,31 @@
-
 // export default upload;
 
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleAuth } from 'google-auth-library';
 import mongoose from "mongoose";
 import User from "../models/user.js";
 
 dotenv.config();
 
-// Initialize Google Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY );
+// Initialize Google Auth for Vertex AI API
+const auth = new GoogleAuth({
+    keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform']
+});
 
-// Rate limiting for Gemini API
-let lastGeminiCall = 0;
-const GEMINI_RATE_LIMIT_MS = 2000; // 2 seconds between calls
+// Function to get access token
+const getAccessToken = async () => {
+    const client = await auth.getClient();
+    const accessToken = await client.getAccessToken();
+    return accessToken.token;
+};
+
+// Rate limiting for Vertex AI API
+let lastVertexCall = 0;
+const VERTEX_RATE_LIMIT_MS = 1000; // 1 second between calls
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -92,24 +101,22 @@ const getMimeType = (filePath) => {
     return mimeTypes[ext] || 'application/octet-stream';
 };
 
-// Function to process document with Gemini Vision API
-const processDocumentWithGemini = async (filePath) => {
+// Function to process document with Vertex AI REST API
+const processDocumentWithVertexAI = async (filePath) => {
     try {
-        console.log("Processing document with Gemini Vision API");
+        console.log("Processing document with Vertex AI Gemini Vision API");
         
         // Rate limiting
         const now = Date.now();
-        const timeSinceLastCall = now - lastGeminiCall;
-        if (timeSinceLastCall < GEMINI_RATE_LIMIT_MS) {
-            await delay(GEMINI_RATE_LIMIT_MS - timeSinceLastCall);
+        const timeSinceLastCall = now - lastVertexCall;
+        if (timeSinceLastCall < VERTEX_RATE_LIMIT_MS) {
+            await delay(VERTEX_RATE_LIMIT_MS - timeSinceLastCall);
         }
-        lastGeminiCall = Date.now();
+        lastVertexCall = Date.now();
 
         const { mimeType, data } = convertFileToBase64(filePath);
+        const accessToken = await getAccessToken();
         
-        // Use Gemini Pro Vision for document analysis
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
-
         const prompt = `
 Analyze this document image and extract the following information:
 
@@ -131,18 +138,48 @@ Return ONLY a JSON object in this exact format:
 }
 `;
 
-        const imagePart = {
-            inlineData: {
-                data: data,
-                mimeType: mimeType
+        const requestBody = {
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        { text: prompt },
+                        {
+                            inline_data: {
+                                mime_type: mimeType,
+                                data: data
+                            }
+                        }
+                    ]
+                }
+            ],
+            generation_config: {
+                max_output_tokens: 2048,
+                temperature: 0.1,
+                top_p: 0.8,
             }
         };
 
-        const result = await model.generateContent([prompt, imagePart]);
-        const response = await result.response;
-        const text = response.text();
+        const apiUrl = `https://${process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'}-aiplatform.googleapis.com/v1/projects/${process.env.GOOGLE_CLOUD_PROJECT_ID}/locations/${process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'}/publishers/google/models/gemini-2.5-flash-preview-05-20:generateContent`;
 
-        console.log("Gemini raw response:", text);
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+
+        const result = await response.json();
+        const text = result.candidates[0].content.parts[0].text;
+
+        console.log("Vertex AI raw response:", text);
 
         // Clean and parse the response
         let cleanedResponse = text.replace(/```json|```/g, '').trim();
@@ -151,14 +188,14 @@ Return ONLY a JSON object in this exact format:
             const parsedData = JSON.parse(cleanedResponse);
             return JSON.stringify(parsedData);
         } catch (parseError) {
-            console.error("Failed to parse Gemini response as JSON:", parseError);
+            console.error("Failed to parse Vertex AI response as JSON:", parseError);
             
             // Fallback: try to extract information manually from the text
             return extractInfoFromText(text);
         }
 
     } catch (error) {
-        console.error("Gemini processing failed:", error);
+        console.error("Vertex AI processing failed:", error);
         
         // Return error response
         return JSON.stringify({
@@ -219,16 +256,16 @@ const extractInfoFromText = (text) => {
     }
 };
 
-// Function to compare extracted info with database
+// Function to compare extracted info with database using Vertex AI
 const compareWithDatabase = async (extractedInfo) => {
     try {
-        // Rate limiting for Gemini API
+        // Rate limiting for Vertex AI API
         const now = Date.now();
-        const timeSinceLastCall = now - lastGeminiCall;
-        if (timeSinceLastCall < GEMINI_RATE_LIMIT_MS) {
-            await delay(GEMINI_RATE_LIMIT_MS - timeSinceLastCall);
+        const timeSinceLastCall = now - lastVertexCall;
+        if (timeSinceLastCall < VERTEX_RATE_LIMIT_MS) {
+            await delay(VERTEX_RATE_LIMIT_MS - timeSinceLastCall);
         }
-        lastGeminiCall = Date.now();
+        lastVertexCall = Date.now();
 
         let parsedInfo;
         try {
@@ -283,9 +320,9 @@ const compareWithDatabase = async (extractedInfo) => {
             };
         }
 
-        // If no direct match, use Gemini for intelligent comparison
+        // If no direct match, use Vertex AI for intelligent comparison
         try {
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const accessToken = await getAccessToken();
             
             const prompt = `
 Compare these two dates and determine if they represent the same date:
@@ -307,8 +344,36 @@ Respond with JSON:
 If they don't match, provide guidance on how to correct the discrepancy.
 `;
             
-            const result = await model.generateContent(prompt);
-            const responseText = result.response.text();
+            const requestBody = {
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: prompt }]
+                    }
+                ],
+                generation_config: {
+                    max_output_tokens: 1024,
+                    temperature: 0.1,
+                }
+            };
+
+            const apiUrl = `https://${process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'}-aiplatform.googleapis.com/v1/projects/${process.env.GOOGLE_CLOUD_PROJECT_ID}/locations/${process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'}/publishers/google/models/gemini-2.5-flash-preview-05-20:generateContent`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            const responseText = result.candidates[0].content.parts[0].text;
             
             try {
                 const parsedResponse = JSON.parse(responseText.replace(/```json|```/g, '').trim());
@@ -317,7 +382,7 @@ If they don't match, provide guidance on how to correct the discrepancy.
                     userFound: true
                 };
             } catch (e) {
-                console.error("Invalid JSON from Gemini:", responseText);
+                console.error("Invalid JSON from Vertex AI:", responseText);
                 return {
                     isMatch: false,
                     userFound: true,
@@ -325,8 +390,8 @@ If they don't match, provide guidance on how to correct the discrepancy.
                 };
             }
             
-        } catch (geminiError) {
-            console.error("Gemini comparison failed:", geminiError);
+        } catch (vertexAIError) {
+            console.error("Vertex AI comparison failed:", vertexAIError);
             return {
                 isMatch: false,
                 userFound: true,
@@ -359,9 +424,9 @@ const upload = (req, res) => {
         console.log("File uploaded:", req.file.filename);
 
         try {
-            // Process document using Gemini Vision API
+            // Process document using Vertex AI Gemini Vision API
             console.log("Starting document processing...");
-            const extractedInfo = await processDocumentWithGemini(req.file.path);
+            const extractedInfo = await processDocumentWithVertexAI(req.file.path);
             console.log("Extracted Info:", extractedInfo);
             
             // Compare with database
@@ -388,7 +453,7 @@ const upload = (req, res) => {
             console.error("Processing Error:", processingError);
             
             // Clean up temporary file
-            if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+            if (req.file && req.file.path && fs.existsExists(req.file.path)) {
                 fs.unlinkSync(req.file.path);
                 console.log("Temporary file deleted after error");
             }

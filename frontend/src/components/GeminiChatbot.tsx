@@ -1,6 +1,7 @@
+
+
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const IMAGE_PATH = "/letters"; // Path where letter images are stored
 
@@ -35,23 +36,21 @@ function GeminiChatbot({ isOpen, onClose, detectedText }: GeminiChatbotProps) {
   const fetchChatResponse = async (text: string) => {
     setIsLoading(true);
     try {
-      const genAI = new GoogleGenerativeAI("AIzaSyBecICH8uq3QHnZ7QyJZ5_uhocJAmrcqdY");
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Correct model version
-  
-      const prompt = `Tell me about the schemes from ${text} in 50 words`;
-  
-      // Correct API request format
-      const result = await model.generateContent(prompt)
-  
-      // Extract response text correctly
-      const responseText = result?.response.candidates[0].content.parts[0].text;
-      console.log("Gemini API response:", result);
+      const response = await fetch("http://localhost:4000/api/gemini/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ detectedText: text }),
+      });
 
-      if (typeof responseText === "string") {
-        setChatResponse(responseText);
-        setResponseLetters(responseText.split(""));
+      const data = await response.json();
+      
+      if (response.ok) {
+        setChatResponse(data.chatResponse);
+        setResponseLetters(data.responseLetters);
       } else {
-        setChatResponse("Invalid response format from chatbot.");
+        setChatResponse(data.error || "Error fetching chat response.");
       }
     } catch (error) {
       console.error("Error fetching chat response:", error);
@@ -89,5 +88,3 @@ function GeminiChatbot({ isOpen, onClose, detectedText }: GeminiChatbotProps) {
 }
 
 export default GeminiChatbot;
-
-
